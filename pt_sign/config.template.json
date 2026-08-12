@@ -1,0 +1,20 @@
+{
+  "sites": [
+    {
+      "name": "PTTime",
+      "base_url": "https://www.pttime.org",
+      "sign_url": "https://www.pttime.org/attendance.php",
+      "cookie": ""
+    },
+    {
+      "name": "拾刻(PTSkitt)",
+      "base_url": "https://www.ptskit.org",
+      "sign_url": "https://www.ptskit.org/attendance.php",
+      "cookie": ""
+    }
+  ],
+  "push": {
+    "wecom_webhook": "",
+    "serverchan_key": ""
+  }
+}

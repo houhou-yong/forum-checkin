@@ -1,0 +1,39 @@
+name: 每日三站签到合并推送
+
+on:
+  schedule:
+    # UTC 23:00 = 北京时间 07:00（GitHub Actions 定时为 best-effort，可能延迟数分钟）
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
+
+permissions:
+  contents: read
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build runtime config from secrets
+        env:
+          PTTIME_COOKIE: ${{ secrets.PTTIME_COOKIE }}
+          PTSKIT_COOKIE: ${{ secrets.PTSKIT_COOKIE }}
+          WNFLB_USERNAME: ${{ secrets.WNFLB_USERNAME }}
+          WNFLB_PASSWORD: ${{ secrets.WNFLB_PASSWORD }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+        run: python prepare_env.py
+
+      - name: Run daily checkin (merge + push)
+        run: python checkin_merged/daily_checkin_merged.py
