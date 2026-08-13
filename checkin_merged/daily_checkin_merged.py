@@ -93,9 +93,18 @@ def run_wnflb():
         ok, msg = wn.do_login(session, username, password)
         if not ok:
             return "FAIL", "登录失败：%s" % msg, "—", "—", "—", "—", "—"
-        logged, html = wn.verify_login(session)
-        if logged:
-            wn.save_cookies(session, cookie_file)
+    logged, html = wn.verify_login(session)
+    if logged:
+        wn.save_cookies(session, cookie_file)
+
+    # 重新拉一次首页，确保签到模块（含累计/连续天数）已渲染；
+    # 避免刚过验证码登录时拿到的是「登录成功」落地页而缺少天数信息（显示「—」）
+    try:
+        resp = wn.fetch_forum(session)
+        if resp is not None:
+            html = wn.get_page_text(resp)
+    except Exception:
+        pass
 
     days_total, days_consec = wn.parse_wnflb_days(html or "")
     today_rank, total_credit, gain = wn.parse_wnflb_extra(html or "")

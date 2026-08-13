@@ -1,0 +1,29 @@
+name: 保活（空提交防定时任务被停用）
+
+# GitHub 对「长期无新提交」的仓库会自动停用 scheduled workflow。
+# 本工作流每月空提交一次，制造仓库活动，从而保住每日 07:00 的签到定时不被停用。
+on:
+  schedule:
+    # 每月 1 号 UTC 03:17 ≈ 北京时间 11:17（避开每日签到 23:00 UTC）
+    - cron: "17 3 1 * *"
+  workflow_dispatch: {}   # 允许在 Actions 页面手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true   # 让后续 git push 使用 GITHUB_TOKEN
+
+      - name: 空提交保活
+        run: |
+          git config user.name "forum-checkin-bot"
+          git config user.email "checkin@local"
+          git commit --allow-empty -m "chore: keepalive $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "nothing to commit"
+          git push
