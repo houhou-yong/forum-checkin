@@ -35,7 +35,14 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 # ========================= 配置 =========================
-BASE_URL = "https://www.wnflb2023.com"
+# 备用域名列表（按顺序探测，第一个可访问的被采用；主域名挂了自动切换）
+BASE_URLS = [
+    "https://www.wnflb2023.com",
+    "https://www.wnflb99.com",
+    "https://www.wnflb.com",
+    "https://www.wonderfulday82.live",
+]
+BASE_URL = BASE_URLS[0]  # 默认主域名，运行前会探测并可能替换
 FORUM_URL = BASE_URL + "/forum.php"
 LOGIN_PAGE_URL = BASE_URL + "/member.php?mod=logging&action=login"
 TIMEOUT = 30
@@ -80,6 +87,34 @@ def get_page_text(resp):
     except (UnicodeDecodeError, LookupError):
         resp.encoding = resp.apparent_encoding or "utf-8"
         return resp.text
+
+
+def resolve_base_url():
+    """按顺序探测备用域名，返回第一个可访问的站点。
+
+    探测成功后会把全局 BASE_URL / FORUM_URL / LOGIN_PAGE_URL 一起切过去；
+    全部失败则回退主域名继续（保持原行为，报错交给后续逻辑）。
+    """
+    global BASE_URL, FORUM_URL, LOGIN_PAGE_URL
+    probe = requests.Session()
+    probe.headers.update(HEADERS)
+    for idx, url in enumerate(BASE_URLS, 1):
+        try:
+            resp = probe.get(url + "/forum.php", timeout=8)
+            if resp.status_code == 200:
+                if url != BASE_URLS[0]:
+                    print(f"  [域名] 主域名不可用，切换到备用域名 {idx}/{len(BASE_URLS)}: {url}")
+                else:
+                    print(f"  [域名] 主域名可用: {url}")
+                BASE_URL = url
+                FORUM_URL = BASE_URL + "/forum.php"
+                LOGIN_PAGE_URL = BASE_URL + "/member.php?mod=logging&action=login"
+                return url
+            print(f"  [域名] {url} 返回状态码 {resp.status_code}，尝试下一个 ...")
+        except requests.RequestException as e:
+            print(f"  [域名] {url} 访问失败({type(e).__name__})，尝试下一个 ...")
+    print(f"  [域名] 全部 {len(BASE_URLS)} 个域名均不可访问，回退主域名 {BASE_URLS[0]} 继续（可能失败）")
+    return BASE_URL
 
 
 def fetch_forum(session):
@@ -735,6 +770,9 @@ def main():
 
     session = requests.Session()
     session.headers.update(HEADERS)
+
+    # 0) 探测可用域名（主域名挂了自动切备用）
+    resolve_base_url()
 
     html = None
     # 1) 尝试用缓存/Cookie 直接登录
