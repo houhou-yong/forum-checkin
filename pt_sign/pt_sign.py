@@ -40,20 +40,25 @@ def load_config():
 
 
 def fetch_text(url, cookie="", referer=""):
-    """GET 页面并返回去标签后的纯文本；失败返回空串。"""
+    """GET 页面并返回去标签后的纯文本；遇偶发网络断连自动重试，仍失败返回空串。"""
     headers = {"User-Agent": UA}
     if cookie:
         headers["Cookie"] = cookie
     if referer:
         headers["Referer"] = referer
-    try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            html = resp.read().decode("utf-8", "ignore")
-        text = re.sub(r"<[^>]+>", " ", html)
-        return re.sub(r"\s+", " ", text)
-    except Exception:
-        return ""
+    _last_err = None
+    for _attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                html = resp.read().decode("utf-8", "ignore")
+            text = re.sub(r"<[^>]+>", " ", html)
+            return re.sub(r"\s+", " ", text)
+        except Exception as _e:
+            _last_err = _e
+            if _attempt < 2:
+                time.sleep(1 * (_attempt + 1))   # 退避 1s / 2s
+    return ""
 
 
 def parse_pt_days(text):
