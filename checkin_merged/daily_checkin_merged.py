@@ -68,8 +68,22 @@ def format_wnflb(status, msg, total, consec, gain, rank, credit):
 def run_wnflb():
     """跑福利吧，返回 (status, msg, total, consec, gain, rank, credit)"""
     import requests  # 仅 wnflb venv 有，放在函数内 import 以便隔离
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
 
     session = requests.Session()
+    # 偶发网络断连自愈：GitHub 海外 runner 访问国内站点时，
+    # 常出现 ConnectionError / RemoteDisconnected（远端直接掐连接）。
+    # 给 adapter 挂 Retry，可避免这类偶发抖动导致整个签到任务失败。
+    _retry = Retry(
+        total=3,
+        backoff_factor=1,                       # 退避 1s / 2s / 4s
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE"],
+    )
+    _adapter = HTTPAdapter(max_retries=_retry)
+    session.mount("https://", _adapter)
+    session.mount("http://", _adapter)
     session.headers.update(wn.HEADERS)
 
     secrets_path = os.path.join(WN_DIR, "secrets.json")
