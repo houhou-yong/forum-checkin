@@ -1,0 +1,84 @@
+name: 移动云盘签到
+
+on:
+  schedule:
+    # 北京时间 08:00 = UTC 00:00
+    - cron: "0 0 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write   # actions/cache 保存/删除缓存需要
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: pip install -r ydyp-sign/requirements.txt
+
+      - name: 恢复 Token 缓存
+        id: token-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ydyp-sign/ydyp_token_storage.json
+          key: ydyp-token
+
+      - name: 生成配置文件
+        env:
+          YDYP_ACCOUNT: ${{ secrets.YDYP_ACCOUNT }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          cd ydyp-sign
+          python - <<'EOF'
+          import json, os
+          cfg = {
+              "accounts": [os.environ["YDYP_ACCOUNT"]],
+              "push": {"wecom_webhook": os.environ["WECOM_WEBHOOK"]},
+          }
+          json.dump(cfg, open("config.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          EOF
+
+      - name: 执行签到（最多 3 次尝试）
+        id: checkin
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          cd ydyp-sign
+          for i in 1 2 3; do
+            echo "===== 第 ${i}/3 次尝试 ====="
+            python run_ydyp.py && {
+              echo "✅ 签到成功"
+              exit 0
+            }
+            echo "❌ 第 ${i} 次失败，清理 token 缓存后重试..."
+            rm -f ydyp_token_storage.json
+            sleep 30
+          done
+          echo "::error::移动云盘签到连续 3 次失败"
+          python - <<'EOF'
+          import json, os, requests
+          webhook = os.environ["WECOM_WEBHOOK"]
+          try:
+              resp = requests.post(webhook, json={"msgtype": "text", "text": {"content": "❌ 移动云盘签到连续 3 次失败，请检查（可能 Authorization 失效，需重新登录 yun.139.com 抓取并更新 GitHub Secret YDYP_ACCOUNT）"}}, timeout=15)
+              print("失败通知已发送:", resp.json().get("errmsg"))
+          except Exception as exc:
+              print("失败通知发送异常:", exc)
+          EOF
+          exit 1
+
+      - name: 保存 Token 缓存
+        if: ${{ steps.checkin.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ydyp-sign/ydyp_token_storage.json
+          key: ydyp-token
