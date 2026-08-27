@@ -108,10 +108,13 @@ jobs:
           date_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
 
           # 三站签到结果
-          if "每日签到结果" in FORUM and ("全部成功" in FORUM or "签到成功" in FORUM):
-              forum_block = FORUM.strip()
+          # 过滤日志噪音
+          forum_clean = "\n".join(l for l in FORUM.splitlines()
+              if not any(j in l for j in ["onnxruntime","pci_bus","GetPciBusId","##[","[login]","[Cookie]","[登录]","(--no-push"])).strip()
+          if "每日签到结果" in forum_clean and ("全部成功" in forum_clean or "签到成功" in forum_clean):
+              forum_block = forum_clean
           else:
-              forum_block = "❌ 签到失败" if "全部成功" not in FORUM and "签到成功" not in FORUM else FORUM.strip()
+              forum_block = "❌ 签到失败" if "全部成功" not in forum_clean and "签到成功" not in forum_clean else forum_clean
 
           # 移动云盘结果：提取关键行
           ydyp_lines = [l for l in YDYP.splitlines()
