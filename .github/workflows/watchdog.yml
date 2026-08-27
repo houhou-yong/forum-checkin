@@ -55,8 +55,13 @@ jobs:
               with urllib.request.urlopen(req, timeout=10) as r:
                   print("push:", json.loads(r.read()).get("errmsg"))
 
+          def bj_date(utc_str):
+              # GitHub created_at 是 UTC，转北京时间取日期
+              dt = datetime.fromisoformat(utc_str.replace("Z", "+00:00"))
+              return (dt + timedelta(hours=8)).strftime("%Y-%m-%d")
+
           runs = api_get("actions/runs?per_page=50")["workflow_runs"]
-          today_runs = [r for r in runs if r["created_at"][:10] == TODAY]
+          today_runs = [r for r in runs if bj_date(r["created_at"]) == TODAY]
 
           wf = "all-checkin.yml"
           ok = [r for r in today_runs if wf in r.get("path","")
