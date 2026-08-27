@@ -58,22 +58,18 @@ jobs:
           runs = api_get("actions/runs?per_page=50")["workflow_runs"]
           today_runs = [r for r in runs if r["created_at"][:10] == TODAY]
 
-          # 检查合并 workflow
-          wf_file = "all-checkin.yml"
-          ok = [r for r in today_runs if wf_file in r.get("path","")
+          wf = "all-checkin.yml"
+          ok = [r for r in today_runs if wf in r.get("path","")
                 and r.get("conclusion") == "success"]
-          failed = [r for r in today_runs if wf_file in r.get("path","")
-                    and r.get("conclusion") == "failure"]
 
           now = datetime.now(TZ).strftime("%H:%M")
           if ok:
-              msg = f"✅ 签到正常 ({TODAY} {now})\n  全部签到成功{len(ok)}次"
+              msg = f"✅ 签到正常 ({TODAY} {now})\n  今日已成功{len(ok)}次"
           else:
-              detail = f"失败{len(failed)}次" if failed else "未触发"
+              failed = [r for r in today_runs if wf in r.get("path","")]
+              detail = f"触发{len(failed)}次未成功" if failed else "未触发"
               msg = f"🔔 签到异常 ({TODAY} {now})\n  {detail}"
-              if trigger(wf_file):
+              if trigger(wf):
                   msg += "\n  → 已自动补触发"
-              else:
-                  msg += "\n  → 补触发失败，请手动检查"
           notify(msg)
           PYEOF
