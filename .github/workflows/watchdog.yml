@@ -58,27 +58,22 @@ jobs:
           runs = api_get("actions/runs?per_page=50")["workflow_runs"]
           today_runs = [r for r in runs if r["created_at"][:10] == TODAY]
 
-          targets = [("daily-checkin.yml", "三站签到"), ("ydyp.yml", "移动云盘")]
-          lines, has_issue = [], False
-
-          for wf, name in targets:
-              ok = [r for r in today_runs if wf in r.get("path","")
-                    and r.get("conclusion") == "success"]
-              failed = [r for r in today_runs if wf in r.get("path","")
-                        and r.get("conclusion") == "failure"]
-              if ok:
-                  lines.append(f"  ✅ {name}: 成功{len(ok)}次")
-              else:
-                  has_issue = True
-                  detail = f"失败{len(failed)}次" if failed else "未触发"
-                  lines.append(f"  ❌ {name}: {detail}")
-                  if trigger(wf):
-                      lines.append(f"     → 已补触发")
+          # 检查合并 workflow
+          wf_file = "all-checkin.yml"
+          ok = [r for r in today_runs if wf_file in r.get("path","")
+                and r.get("conclusion") == "success"]
+          failed = [r for r in today_runs if wf_file in r.get("path","")
+                    and r.get("conclusion") == "failure"]
 
           now = datetime.now(TZ).strftime("%H:%M")
-          status = "🔔 巡检异常" if has_issue else "✅ 签到正常"
-          msg = f"{status} ({TODAY} {now})\n" + "\n".join(lines)
-          if has_issue:
-              msg += "\n\n已自动补发，如仍无通知请手动检查"
+          if ok:
+              msg = f"✅ 签到正常 ({TODAY} {now})\n  全部签到成功{len(ok)}次"
+          else:
+              detail = f"失败{len(failed)}次" if failed else "未触发"
+              msg = f"🔔 签到异常 ({TODAY} {now})\n  {detail}"
+              if trigger(wf_file):
+                  msg += "\n  → 已自动补触发"
+              else:
+                  msg += "\n  → 补触发失败，请手动检查"
           notify(msg)
           PYEOF
