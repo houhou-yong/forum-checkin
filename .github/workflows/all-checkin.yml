@@ -120,8 +120,8 @@ jobs:
               forum_block = "❌ 签到失败" if "全部成功" not in forum_clean and "签到成功" not in forum_clean else forum_clean
 
           # 移动云盘结果：白名单只保留核心信息（签到状态/Token/云朵/账号）
-          ydyp_keep = ["✅已签到", "❌签到失败", "⚠️", "云朵数量", "待领取", "云朵汇总",
-                        "用户【", "Authorization状态", "Token 状态", "膨胀云朵", "云朵中心"]
+          ydyp_keep = ["✅已签到", "❌签到失败", "云朵数量", "待领取", "云朵汇总",
+                        "用户【", "Authorization状态", "Token 状态"]
           ydyp_lines = [l.strip() for l in YDYP.splitlines()
               if any(k in l for k in ydyp_keep)]
           ydyp_clean = "\n".join(ydyp_lines)
