@@ -1,9 +1,6 @@
 name: 每日三站签到合并推送
 
 on:
-  schedule:
-    # UTC 23:00 = 北京时间 07:00（GitHub Actions 定时为 best-effort，可能延迟数分钟）
-    - cron: "23 21,4 * * *"
   workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
 
 permissions:
