@@ -113,7 +113,7 @@ jobs:
           forum_clean = re.sub(r"\x1b\[[0-9;]*m", "", FORUM)
           forum_clean = "\n".join(l for l in forum_clean.splitlines()
               if not any(j in l for j in
-              ["onnxruntime","pci_bus","GetPciBusId","device_discovery","##[group]","##[endgroup]","##[warning]","(--no-push","shell: /usr/bin","Run checkin","Run forum","Run daily","Run merged","pip install","Successfully installed","Collecting","Downloading","Requirement already","Installing collected","python3 ","python3\n","  WARNING:","  Attempting"]))
+              ["onnxruntime","pci_bus","GetPciBusId","device_discovery","##[group]","##[endgroup]","##[warning]","(--no-push","shell: /usr/bin","Run checkin","Run forum","Run daily","Run merged","pip install","Successfully installed","Collecting","Downloading","Requirement already","Installing collected","python3 ","python3\n","  WARNING:","  Attempting", "[login]", "[Cookie]", "[登录]"]))
           if "每日签到结果" in forum_clean and ("全部成功" in forum_clean or "签到成功" in forum_clean):
               forum_block = forum_clean
           else:
