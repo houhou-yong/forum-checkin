@@ -110,7 +110,7 @@ jobs:
           # 三站签到结果
           # 过滤日志噪音
           forum_clean = "\n".join(l for l in FORUM.splitlines()
-              if not any(j in l for j in ["onnxruntime","pci_bus","GetPciBusId","##[","[login]","[Cookie]","[登录]","(--no-push"])).strip()
+              if not any(j in l for j in ["onnxruntime","pci_bus","GetPciBusId","##[","[login]","[Cookie]","[登录]","(--no-push","[0;","[m","[W:","[E:","device_discovery"])).strip()
           if "每日签到结果" in forum_clean and ("全部成功" in forum_clean or "签到成功" in forum_clean):
               forum_block = forum_clean
           else:
