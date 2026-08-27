@@ -833,6 +833,19 @@ def main():
     success, message = parse_result(text)
     if success:
         print(f"[OK] {message}")
+        # 签到成功后重新抓首页，确保拿到最新的累计/连续天数（签到前可能因验证码重试抓不到）
+        if days_total == "—" or total_credit == "—":
+            print("  -> 签到前数据不全，重新抓首页解析 ...")
+            resp2 = fetch_forum(session)
+            if resp2 is not None:
+                html2 = get_page_text(resp2)
+                d2 = parse_wnflb_days(html2 or "")
+                if d2[0] != "—":
+                    days_total, days_consec = d2
+                e2 = parse_wnflb_extra(html2 or "")
+                if e2[1] != "—":
+                    today_rank, total_credit, gain = e2
+                print(f"  -> 补抓成功: 已签到 {days_total} 天 / 连续 {days_consec} 天 / 积分 {total_credit}")
         send_notification(f"✅ [签到成功] {args.mode}",
                           f"时间:{now}\n结果:{message}\n已签到:{days_total} 天\n已连续签到:{days_consec} 天\n本次获得积分:{gain}\n今日签到名次:{today_rank}\n积分:{total_credit}")
     else:
