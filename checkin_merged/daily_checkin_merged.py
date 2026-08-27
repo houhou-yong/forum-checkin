@@ -122,6 +122,15 @@ def run_wnflb():
 
     days_total, days_consec = wn.parse_wnflb_days(html or "")
     today_rank, total_credit, gain = wn.parse_wnflb_extra(html or "")
+    if days_total == "—" or total_credit == "—":
+        # DEBUG: 输出解码后的首页纯文本，检查是否含签到/积分文案
+        import re as _re
+        _t = _re.sub(r"<[^>]+>", " ", html or "")
+        _t = _re.sub(r"\s+", " ", _t)
+        _hit = [w for w in ["签到", "积分", "累计", "连续", "天数", "福币"] if w in _t]
+        print("[DBG2] 命中关键词:", _hit)
+        print("[DBG2] 首页纯文本片段:", _t[200:900])
+        print("[DBG2] html长度:", len(html or ""), "已签到:", wn.check_already_signed(html or ""))
 
     if wn.check_already_signed(html):
         return "OK", "今日已签到", days_total, days_consec, gain, today_rank, total_credit
