@@ -1,0 +1,121 @@
+name: 每日全部签到
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  # ====== 三站签到 ======
+  forum-checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build runtime config from secrets
+        env:
+          PTTIME_COOKIE: ${{ secrets.PTTIME_COOKIE }}
+          PTSKIT_COOKIE: ${{ secrets.PTSKIT_COOKIE }}
+          WNFLB_USERNAME: ${{ secrets.WNFLB_USERNAME }}
+          WNFLB_PASSWORD: ${{ secrets.WNFLB_PASSWORD }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+        run: python prepare_env.py
+
+      - name: Run daily checkin (merge + push)
+        run: python checkin_merged/daily_checkin_merged.py
+
+  # ====== 移动云盘签到 ======
+  ydyp-checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r ydyp-sign/requirements.txt
+
+      - name: Restore Token cache
+        id: token-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ydyp-sign/ydyp_token_storage.json
+          key: ydyp-token
+
+      - name: Generate config
+        env:
+          YDYP_ACCOUNT: ${{ secrets.YDYP_ACCOUNT }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          cd ydyp-sign
+          python - <<'PYEOF'
+          import json, os
+          cfg = {
+              "accounts": [os.environ["YDYP_ACCOUNT"]],
+              "push": {"wecom_webhook": os.environ["WECOM_WEBHOOK"]},
+          }
+          json.dump(cfg, open("config.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          PYEOF
+
+      - name: Run YDYP checkin (retry up to 3)
+        id: ydyp-checkin
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          cd ydyp-sign
+          for i in 1 2 3; do
+            echo "===== Attempt ${i}/3 ====="
+            python run_ydyp.py && {
+              echo "✅ YDYP checkin OK"
+              exit 0
+            }
+            echo "❌ Attempt ${i} failed, clearing token cache..."
+            rm -f ydyp_token_storage.json
+            sleep 30
+          done
+          echo "::error::YDYP checkin failed 3 times"
+          exit 1
+
+      - name: Save Token cache
+        if: ${{ steps.ydyp-checkin.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ydyp-sign/ydyp_token_storage.json
+          key: ydyp-token
+
+  # ====== 新签到扩展位（取消注释启用） ======
+  # new-checkin:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 10
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.11"
+  #     - name: Install dependencies
+  #       run: pip install -r new-signin/requirements.txt
+  #     - name: Run new checkin
+  #       env:
+  #         NEW_SITE_COOKIE: ${{ secrets.NEW_SITE_COOKIE }}
+  #         WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+  #       run: python new-signin/checkin.py
