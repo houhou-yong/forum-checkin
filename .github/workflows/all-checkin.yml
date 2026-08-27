@@ -119,18 +119,11 @@ jobs:
           else:
               forum_block = "❌ 签到失败" if "全部成功" not in forum_clean and "签到成功" not in forum_clean else forum_clean
 
-          # 移动云盘结果：只保留关键信息（签到状态/账号/云朵/Token）
-          ydyp_lines = []
-          for l in YDYP.splitlines():
-              s = l.strip()
-              if not s: continue
-              # 跳过 runner 噪音
-              if any(j in s for j in ["##[", "::group::", "::endgroup::", "Run YDYP", "shell: /usr/bin", "python3 ", "python3\n", "Loading notification", "pip install", "Successfully installed", "Collecting", "Downloading", "Requirement already", "Installing collected", "  WARNING:", "  Attempting"]): continue
-              # 跳过脚本头/分隔符/任务列表/错误信息
-              if any(j in s for j in ["📱 共", "移动云盘自动签到", "移动云盘共获取到", "变量格式:", "======== ▷", "======== ========", "准备进行下一个", "================ 运行总结", "加载通知服务成功", "⚠️ 未配置", "📮 联动任务", "✨ 新版热门任务", "📆 云盘每日任务", "📆 云盘每月任务", "📰 公众号任务", "🔥 热门任务", "📧 139邮箱任务", "📆 139邮箱每月任务", "活动已结束", "AI相机任务失败", "达到最大重试", "错误信息:", "剩余抽奖次数", "本月未备份", "请求异常:", "❌戳一戳", "❌未摇中", "❌抽奖失败"]): continue
-              # 跳过任务条目（以 - 开头，但保留包含云朵/签到的）
-              if s.startswith("-") and "云朵" not in s and "签到" not in s: continue
-              ydyp_lines.append(l)
+          # 移动云盘结果：白名单只保留核心信息（签到状态/Token/云朵/账号）
+          ydyp_keep = ["✅已签到", "❌签到失败", "⚠️", "云朵数量", "待领取", "云朵汇总",
+                        "用户【", "Authorization状态", "Token 状态", "膨胀云朵", "云朵中心"]
+          ydyp_lines = [l.strip() for l in YDYP.splitlines()
+              if any(k in l for k in ydyp_keep)]
           ydyp_clean = "\n".join(ydyp_lines)
           if ydyp_clean:
               if "已签到" in YDYP or "签到成功" in YDYP:
