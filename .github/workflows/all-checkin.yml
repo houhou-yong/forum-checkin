@@ -131,7 +131,7 @@ jobs:
           elif ydyp_fail:
               ydyp_block = "云朵签到失败"
           else:
-              ydyp_block = "云朵签到结果未知")
+              ydyp_block = "云朵签到结果未知"
 
           msg = f"📅 每日签到 ({date_str})\n\n"
           msg += "【三站签到】\n" + forum_block + "\n\n"
