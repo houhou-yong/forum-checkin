@@ -3,7 +3,7 @@ name: 移动云盘签到
 on:
   schedule:
     # 北京时间 08:00 = UTC 00:00
-    - cron: "17 0 * * *"
+    - cron: "43 21,4 * * *"
   workflow_dispatch: {}
 
 permissions:
