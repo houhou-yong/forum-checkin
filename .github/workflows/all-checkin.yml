@@ -95,8 +95,6 @@ jobs:
           WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
           FORUM: ${{ needs.forum-checkin.outputs.result }}
           YDYP: ${{ needs.ydyp-checkin.outputs.result }}
-          FORUM_OK: ${{ needs.forum-checkin.outcome == 'success' }}
-          YDYP_OK: ${{ needs.ydyp-checkin.outcome == 'success' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, datetime
@@ -104,21 +102,21 @@ jobs:
           WEBHOOK = os.environ["WEBHOOK"]
           FORUM = os.environ["FORUM"] or "(无输出)"
           YDYP = os.environ["YDYP"] or "(无输出)"
-          FORUM_OK = os.environ["FORUM_OK"] == "true"
-          YDYP_OK = os.environ["YDYP_OK"] == "true"
+          FORUM_OK = "全部成功" in FORUM or "签到成功" in FORUM
+          YDYP_OK = "已签到" in YDYP or "签到成功" in YDYP
 
           date_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
 
           # 三站签到结果
-          if FORUM_OK and "每日签到结果" in FORUM:
+          if "每日签到结果" in FORUM and ("全部成功" in FORUM or "签到成功" in FORUM):
               forum_block = FORUM.strip()
           else:
-              forum_block = "❌ 签到失败" if not FORUM_OK else FORUM.strip()
+              forum_block = "❌ 签到失败" if "全部成功" not in FORUM and "签到成功" not in FORUM else FORUM.strip()
 
           # 移动云盘结果：提取关键行
           ydyp_lines = [l for l in YDYP.splitlines()
                         if any(k in l for k in ["签到成功","已签到","获得","云朵","失效","失败","OK","FAIL"])]
-          ydyp_block = "\n".join(ydyp_lines[-6:]) if ydyp_lines else ("签到成功" if YDYP_OK else "签到失败")
+          ydyp_block = "\n".join(ydyp_lines[-6:]) if ydyp_lines else ("签到成功" if ("已签到" in YDYP or "签到成功" in YDYP) else "签到失败")
 
           msg = f"📅 每日签到 ({date_str})\n\n"
           msg += "【三站签到】\n" + forum_block + "\n\n"
