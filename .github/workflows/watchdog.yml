@@ -1,0 +1,92 @@
+name: Watchdog 签到巡检
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检查今日签到 + 补跑 + 推送
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, urllib.request
+          from datetime import datetime, timezone, timedelta
+
+          TZ = timezone(timedelta(hours=8))
+          TODAY = datetime.now(TZ).strftime("%Y-%m-%d")
+          TOKEN = os.environ.get("TOKEN", "")
+          WEBHOOK = os.environ.get("WEBHOOK", "")
+          REPO = os.environ.get("REPO", "")
+
+          def api_get(path):
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{REPO}/{path}",
+                  headers={"Authorization": f"Bearer {TOKEN}",
+                           "Accept": "application/vnd.github+json"})
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  return json.loads(r.read())
+
+          def api_post(path):
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{REPO}/{path}",
+                  method="POST",
+                  data=json.dumps({"ref":"main"}).encode(),
+                  headers={"Authorization": f"Bearer {TOKEN}",
+                           "Accept": "application/vnd.github+json",
+                           "Content-Type": "application/json"})
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  return r.status
+
+          def get_today_runs(wf_file):
+              runs = api_get("actions/runs?per_page=50")["workflow_runs"]
+              return [r for r in runs if r["created_at"][:10] == TODAY
+                      and wf_file in r.get("path","")]
+
+          def trigger(wf_file):
+              try:
+                  api_post(f"actions/workflows/{wf_file}/dispatches")
+                  return True
+              except Exception as e:
+                  return str(e)
+
+          def notify(text):
+              if not WEBHOOK: return
+              data = json.dumps({"msgtype":"text","text":{"content":text}}).encode()
+              req = urllib.request.Request(WEBHOOK, data=data, method="POST",
+                  headers={"Content-Type":"application/json"})
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  print("push:", json.loads(r.read()).get("errmsg"))
+
+          targets = [
+              ("daily-checkin.yml", "三站签到"),
+              ("ydyp.yml", "移动云盘"),
+          ]
+
+          lines, has_issue = [], False
+          for wf, name in targets:
+              runs = get_today_runs(wf)
+              ok = [r for r in runs if r.get("conclusion")=="success"]
+              if ok:
+                  lines.append(f"  ✅ {name}: 成功{len(ok)}次")
+              else:
+                  has_issue = True
+                  lines.append(f"  ❌ {name}: {'触发'+str(len(runs))+'次未成功' if runs else '未触发'}")
+                  t = trigger(wf)
+                  lines.append(f"     → {'已补触发' if t is True else '补发失败:'+str(t)}")
+
+          now = datetime.now(TZ).strftime("%H:%M")
+          if has_issue:
+              msg = f"🔔 签到巡检异常({TODAY} {now})\n"+"\n".join(lines)+"\n\n已自动补发，稍后检查"
+          else:
+              msg = f"✅ 签到正常({TODAY} {now})\n"+"\n".join(lines)
+          print(msg); notify(msg)
+          PYEOF
