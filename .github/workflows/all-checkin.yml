@@ -116,10 +116,22 @@ jobs:
           else:
               forum_block = "❌ 签到失败" if "全部成功" not in forum_clean and "签到成功" not in forum_clean else forum_clean
 
-          # 移动云盘结果：提取关键行
-          ydyp_lines = [l for l in YDYP.splitlines()
-                        if any(k in l for k in ["签到成功","已签到","获得","云朵","失效","失败","OK","FAIL"])]
-          ydyp_block = "\n".join(ydyp_lines[-6:]) if ydyp_lines else ("签到成功" if ("已签到" in YDYP or "签到成功" in YDYP) else "签到失败")
+          # 移动云盘结果：智能解析
+          import re
+          ydyp_ok = "已签到" in YDYP or "签到成功" in YDYP
+          ydyp_fail = "失效" in YDYP or "签到失败" in YDYP
+          ydyp_total = ""
+          m = re.search(r"当前云朵数量[:：]\s*(\d+)", YDYP)
+          if m: ydyp_total = m.group(1)
+          if not ydyp_total:
+              m = re.search(r"用户.*?[:：]\s*(\d+)云朵", YDYP)
+              if m: ydyp_total = m.group(1)
+          if ydyp_ok:
+              ydyp_block = f"云朵签到成功" + (f" | 共{ydyp_total}云朵" if ydyp_total else "")
+          elif ydyp_fail:
+              ydyp_block = "云朵签到失败"
+          else:
+              ydyp_block = "云朵签到结果未知")
 
           msg = f"📅 每日签到 ({date_str})\n\n"
           msg += "【三站签到】\n" + forum_block + "\n\n"
