@@ -79,11 +79,33 @@ def parse_cookies(raw):
 
 
 def get_page_text(resp):
-    """优先按 GBK 解码（论坛是 GBK）"""
-    if resp.encoding and resp.encoding.lower() in ("gbk", "gb2312", "gb18030"):
-        return resp.text
+    """按页面实际编码解码：优先 meta charset，UTF-8 优先，GBK 兜底。"""
+    raw = resp.content
+    if not raw:
+        return ""
+    # 1) 从 HTML 前 2KB 找 <meta charset=...> 声明
+    head = raw[:2048].decode("latin-1", errors="ignore").lower()
+    m = re.search(r'charset=["\']?\s*([\w-]+)', head)
+    declared = m.group(1).strip().strip('"\'') if m else None
+    if declared and declared not in ("iso-8859-1", "latin-1"):
+        try:
+            return raw.decode(declared)
+        except (UnicodeDecodeError, LookupError):
+            pass
+    # 2) 按 HTTP header 声明的编码（跳过 requests 默认的 ISO-8859-1）
+    if resp.encoding and resp.encoding.lower() not in ("iso-8859-1", "latin-1"):
+        try:
+            return raw.decode(resp.encoding)
+        except (UnicodeDecodeError, LookupError):
+            pass
+    # 3) UTF-8 优先（当前论坛是 utf-8）
     try:
-        return resp.content.decode("gbk")
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    # 4) GBK 兜底（旧页面）
+    try:
+        return raw.decode("gbk")
     except (UnicodeDecodeError, LookupError):
         resp.encoding = resp.apparent_encoding or "utf-8"
         return resp.text
