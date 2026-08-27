@@ -122,13 +122,6 @@ def run_wnflb():
 
     days_total, days_consec = wn.parse_wnflb_days(html or "")
     today_rank, total_credit, gain = wn.parse_wnflb_extra(html or "")
-    if days_total == "—" or total_credit == "—":
-        # DEBUG: 抓不到天数时输出首页文本片段，诊断是页面结构还是风控
-        import re as _re
-        _text = _re.sub(r"<[^>]+>", " ", html or "")
-        _text = _re.sub(r"\s+", " ", _text)
-        print("[DEBUG] 福利吧首页片段:", _text[:700])
-        print("[DEBUG] 签到状态: 已签到=%s" % wn.check_already_signed(html or ""))
 
     if wn.check_already_signed(html):
         return "OK", "今日已签到", days_total, days_consec, gain, today_rank, total_credit
