@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
 
 permissions:
-  contents: read
+  contents: write   # token 回写需要
   actions: write   # actions/cache 保存/删除缓存需要
 
 jobs:
@@ -33,6 +33,24 @@ jobs:
         with:
           path: ydyp-sign-3/ydyp_token_storage.json
           key: ydyp-token-3
+
+      - name: 回写最新 Token 到仓库（供 NAS 侧同步）
+        if: ${ '{' } steps.checkin.outcome == 'success' { '}' }
+        run: |
+          cd ydyp-sign-3
+          if [ -f ydyp_token_storage.json ]; then
+            git config user.name "fmdxx1991"
+            git config user.email "fmdxx1991@gmail.com"
+            git add ydyp_token_storage.json
+            if git diff --cached --quiet; then
+              echo "token 无变化，跳过提交"
+            else
+              git commit -m "chore: 同步最新 ydyp token (auto)"
+              git pull --rebase origin ${ '{' } github.ref_name { '}' } || true
+              git push origin HEAD:${ '{' } github.ref_name { '}' }
+              echo "✅ 最新 token 已提交到仓库"
+            fi
+          fi
 
       - name: 生成配置文件
         env:
