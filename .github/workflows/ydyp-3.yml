@@ -2,8 +2,9 @@ name: 移动云盘签到-账号3
 
 on:
   schedule:
-    # 北京时间 08:30 = UTC 00:30
+    # 北京时间 08:30 / 20:30（每天 2 次，与老板既有签到节奏一致）= UTC 00:30 / 12:30
     - cron: "30 0 * * *"
+    - cron: "30 12 * * *"
   workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
 
 permissions:
