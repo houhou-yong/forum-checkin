@@ -3,8 +3,7 @@ name: 移动云盘签到-账号3
 on:
   schedule:
     # 北京时间 05:00 / 12:10 —— 与账号1 总编排 all-checkin.yml 完全一致（每天 2 次）
-    - cron: "0 21 * * *"    # 北京 05:00 = UTC 21:00
-    - cron: "10 4 * * *"    # 北京 12:10 = UTC 04:10
+    - cron: "0 21 * * *"    # 北京 05:00 = UTC 21:00（账号3 仍在 GitHub 跑，每天仅此一次）
   workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
 
 permissions:
@@ -71,6 +70,7 @@ jobs:
         id: checkin
         env:
           WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          YDYP_NOTIFY_PREFIX: "【GitHub】"
         run: |
           cd ydyp-sign-3
           for i in 1 2 3; do
@@ -88,7 +88,7 @@ jobs:
           import json, os, requests
           webhook = os.environ["WECOM_WEBHOOK"]
           try:
-              resp = requests.post(webhook, json={"msgtype": "text", "text": {"content": "❌ 移动云盘账号3签到连续 3 次失败，请检查（可能 Authorization 失效，需重新登录 yun.139.com 抓取并更新 GitHub Secret YDYP_ACCOUNT_3）"}}, timeout=15)
+              resp = requests.post(webhook, json={"msgtype": "text", "text": {"content": "【GitHub】❌ 移动云盘账号3签到连续 3 次失败，请检查（可能 Authorization 失效，需重新登录 yun.139.com 抓取并更新 GitHub Secret YDYP_ACCOUNT_3）"}}, timeout=15)
               print("失败通知已发送:", resp.json().get("errmsg"))
           except Exception as exc:
               print("失败通知发送异常:", exc)
