@@ -1,10 +1,10 @@
 name: 移动云盘签到-账号2
 
 on:
-  schedule:
-    # 北京时间 05:00 / 12:10 —— 与账号1 总编排 all-checkin.yml 完全一致（每天 2 次）
-    - cron: "0 21 * * *"    # 北京 05:00 = UTC 21:00
-    - cron: "10 4 * * *"    # 北京 12:10 = UTC 04:10
+  # 2026-09-24 起账号2 已迁飞牛 NAS，GitHub 侧仅保留手动兜底
+  # 需要恢复定时：把下面两行 cron 的注释去掉即可
+  #   - cron: "0 21 * * *"    # 北京 05:00
+  #   - cron: "10 4 * * *"    # 北京 12:10
   workflow_dispatch: {}   # 允许在 Actions 页面手动点「Run workflow」即时测试
 
 permissions:
