@@ -2036,4 +2036,5 @@ if __name__ == "__main__":
     send = load_send()
 
     if send:
-        send('中国移动云盘任务信息', msg)
+        _tag = "GitHub" if os.environ.get("GITHUB_ACTIONS") else ("飞牛" if os.name == "posix" else "本地")
+        send('【%s】中国移动云盘任务信息' % _tag, msg)
