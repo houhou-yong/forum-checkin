@@ -9,3 +9,10 @@ __pycache__/
 
 # 日志
 *.log
+
+# 云盘多账号（2026-10-05 合并）—— 含真实 Authorization，绝不入库
+ydyp-multi/accounts.json
+ydyp-multi/ydyp_token_storage.json
+# 各云盘目录的凭据/缓存兜底
+ydyp-sign*/config.json
+ydyp-sign*/ydyp_token_storage.json
