@@ -629,6 +629,23 @@ class YP:
                     return None
                 time.sleep(1)
 
+    @staticmethod
+    def _tyrz_sign_headers():
+        """2026-10-23 tyrzLogin.action 被官方下线(全主机404)，新接口:
+        POST https://m.mcloud.139.com/ycloud/auth-service/auth/tyrzLogin
+        签名算法(抓包自 H5 bundle 139newsignin~...~promotion~test.js):
+        x-signature = MD5(secret + x-request-id + x-timestamp + x-nonce + '' + secret)
+        secret = 'sekaMdYYLIZfbCfm' (String.fromCodePoint 混淆)"""
+        secret = 'sekaMdYYLIZfbCfm'
+        rid = str(uuid.uuid4())
+        ts = str(int(time.time() * 1000))
+        nonce = str(uuid.uuid4())
+        sig = hashlib.md5((secret + rid + ts + nonce + '' + secret).encode('utf-8')).hexdigest()
+        return {'Content-Type': 'application/json;charset=UTF-8',
+                'x-request-id': rid, 'x-timestamp': ts, 'x-nonce': nonce, 'x-signature': sig,
+                'Referer': 'https://m.mcloud.139.com/',
+                'Origin': 'https://m.mcloud.139.com'}
+
     def request_json(self, url, headers=None, cookies=None, data=None, params=None, method='GET', debug=None, retries=5):
         response = self.send_request(url, headers=headers, cookies=cookies, data=data, params=params, method=method, debug=debug, retries=retries)
         if response is None:
@@ -1500,8 +1517,14 @@ class YP:
             self.refresh_authorization_token(force=True)
             token = self.sso()
         if token is not None:
-            jwt_url = f"https://caiyun.feixin.10086.cn:7071/portal/auth/tyrzLogin.action?ssoToken={token}"
-            jwt_data = self.request_json(jwt_url, headers=self.jwtHeaders, method='POST')
+            jwt_url = 'https://m.mcloud.139.com/ycloud/auth-service/auth/tyrzLogin'
+            req_headers = dict(self.jwtHeaders)
+            req_headers['Host'] = 'm.mcloud.139.com'
+            req_headers.pop('jwtToken', None)
+            req_headers.update(self._tyrz_sign_headers())
+            jwt_body = json.dumps({'token': token, 'openAccount': 0,
+                                   'marketName': 'sign_in_3', 'sourceId': '1427'})
+            jwt_data = self.request_json(jwt_url, headers=req_headers, method='POST', data=jwt_body)
             if not jwt_data:
                 self.log('JWT获取失败: 接口无响应')
                 return False
@@ -1512,8 +1535,11 @@ class YP:
                 if token is None:
                     self.log('-ck可能失效了')
                     return False
-                jwt_url = f"https://caiyun.feixin.10086.cn:7071/portal/auth/tyrzLogin.action?ssoToken={token}"
-                jwt_data = self.request_json(jwt_url, headers=self.jwtHeaders, method='POST')
+                req_headers = dict(self.jwtHeaders)
+                req_headers['Host'] = 'm.mcloud.139.com'
+                req_headers.pop('jwtToken', None)
+                req_headers.update(self._tyrz_sign_headers())
+                jwt_data = self.request_json(jwt_url, headers=req_headers, method='POST', data=jwt_body)
                 if not jwt_data:
                     self.log('JWT获取失败: 接口无响应')
                     return False
