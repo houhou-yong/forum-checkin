@@ -415,8 +415,15 @@ def _submit_login(session, formhash, loginhash, username="", password="",
         }
         if seccode:
             data["seccodeverify"] = seccode
-            if seccodehash:
-                data["seccodehash"] = seccodehash
+            # 🔴 2026-10-31 实测（NAS 上跑真实站点，4 种组合对比）：
+            #   seccodeverify + seccodehash            → ✅ 登录成功（logged=True）
+            #   seccodeverify + seccodehash + modid    → ✅ 登录成功
+            #   只有 seccodeverify                      → ❌「验证码填写错误」
+            #   ⇒ **seccodehash 必须一起带**（值 = idhash）。
+            #   注意登录页里没有 name="seccodehash" 隐藏域（那是 JS 动态生成的），
+            #   所以 detect_captcha 的 seccodehash 会回落成 idhash —— 正好是对的。
+            data["seccodehash"] = seccodehash or ""
+            data["seccodemodid"] = "member::logging"
 
     login_url = (
         f"{BASE_URL}/member.php?mod=logging&action=login"
@@ -444,7 +451,12 @@ def _submit_login(session, formhash, loginhash, username="", password="",
             msg = re.sub(r"<[^>]+>", "", cdata.group(1)).strip()
 
     # 仍被要求验证码（验证码错误等）
-    if "请输入验证码" in txt and "auth=" in txt:
+    # 🔴 2026-10-31：原来只判「请输入验证码」+「auth=」，但服务端返回
+    #    「抱歉，验证码填写错误」时**不含**「请输入验证码」⇒ 没进挑战分支。
+    #    判据放宽：提到验证码/seccode 就视为验证码相关（auth= 仍需在，
+    #    因为挑战分支依赖 auth 令牌）。
+    _cap_related = ("请输入验证码" in txt) or ("验证码" in txt) or ("seccode" in txt.lower())
+    if _cap_related and "auth=" in txt:
         return False, (msg or "验证码不正确，请重试"), txt
 
     # 权威校验：访问首页看 discuz_uid 是否为真实 UID
@@ -462,24 +474,58 @@ def do_login(session, username, password):
     """
     账号密码登录（含新 IP 二次验证码挑战）。
     成功返回 (True, 消息)，失败返回 (False, 消息)。
+
+    🔴 2026-10-31 修（GH runner 上福利吧永远登录失败的真因）：
+    Discuz 的**登录页本身就可能带验证码**（新 IP / 首次访问时）。
+    老逻辑只做「先无验证码裸提交 → 失败再进挑战分支」，而挑战分支要求响应里有
+    `auth=` 令牌 —— 但「验证码填写错误」这种响应当场没有 auth=，
+    于是直接判失败返回，ddddocr **一次都没被调用**。
+    ⇒ 现在改成：**登录页若已带验证码（detect_captcha.needed），
+      先解验证码 + 走 seccode 校验，再带验证码提交**。
     """
     print("  [登录] 获取登录页 ...")
     html, formhash, loginhash = fetch_login_page(session)
     if not formhash or not loginhash:
         return False, "无法解析登录页(formhash/loginhash 缺失)"
 
-    # 首次尝试：无验证码直接提交（老 IP / 已信任环境通常直接成功）
-    ok, msg, resp_html = _submit_login(
-        session, formhash, loginhash, username, password, None, None
-    )
-    if ok:
-        return True, "登录成功"
+    # 🔴 登录页自带验证码 → 先识别并校验，再带验证码提交（而不是裸提交挨打）
+    login_cap = detect_captcha(html)
+    if login_cap.get("needed") and login_cap.get("idhash"):
+        print("  [登录] 登录页需要验证码，先识别 ...")
+        code = solve_captcha(session, login_cap)
+        if not code:
+            return False, "验证码识别失败，请检查 ddddocr"
+        if not verify_captcha_code(session, login_cap, code):
+            print("  [登录] 验证码校验未通过，换图重试 ...")
+            for attempt in range(1, 4):
+                code = solve_captcha(session, login_cap)
+                if code and verify_captcha_code(session, login_cap, code):
+                    break
+            else:
+                return False, "验证码识别失败（多次重试仍未通过）"
+        print("  [登录] 验证码校验通过，带验证码提交登录 ...")
+        ok, msg, resp_html = _submit_login(
+            session, formhash, loginhash, username, password,
+            seccode=code,
+            seccodehash=login_cap.get("seccodehash") or login_cap.get("idhash"),
+        )
+        if ok:
+            return True, "登录成功"
+        # 带验证码仍失败 → 可能是「二次验证码挑战」，继续走下面的挑战分支
+        chtml = resp_html or ""
+    else:
+        # 首次尝试：无验证码直接提交（老 IP / 已信任环境通常直接成功）
+        ok, msg, resp_html = _submit_login(
+            session, formhash, loginhash, username, password, None, None
+        )
+        if ok:
+            return True, "登录成功"
+        chtml = resp_html or ""
 
     # 被验证码挑战：从第一次提交的响应里直接解析挑战页（auth 由本次响应给出）。
     # 关键：auth 在 HTML 里可能以 %2F 形式存在（含 /），需先 unquote 还原，
     # 再交给 _submit_login 统一按 form-urlencoded 编码，否则会被二次编码导致
     # 服务端认不出令牌、报“密码空或包含非法字符”。
-    chtml = resp_html or ""
     c_fh, c_lh, auth = extract_login_fields(chtml)
     auth = urllib.parse.unquote(auth) if auth else None
     if not auth:
